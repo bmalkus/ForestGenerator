@@ -11,13 +11,18 @@ public class MovingCamera : MonoBehaviour {
   public Vector3 dir;
 
   // Use this for initialization
-  void Start ()
+  void Start()
   {
     dir = new Vector3(1f, 0f, 1f);
     GetComponent<Camera>().cullingMask = 0x07;
   }
 
-  void Update ()
+  void Update()
+  {
+    transform.LookAt(transform.position + dir);
+  }
+
+  void FixedUpdate()
   {
 
     if (Input.GetKey(KeyCode.RightArrow) || Input.GetKey(KeyCode.F))
@@ -38,11 +43,11 @@ public class MovingCamera : MonoBehaviour {
     if (Input.GetKey(KeyCode.R))
       transform.Translate(new Vector3(speed * Time.deltaTime, 0, 0));
 
-    if (Input.GetKey(KeyCode.Plus))
+    if (Input.GetKey(KeyCode.Plus) || Input.GetKey(KeyCode.RightBracket))
       if (speed < 100f)
         speed += 1f;
 
-    if (Input.GetKey(KeyCode.Minus))
+    if (Input.GetKey(KeyCode.Minus) || Input.GetKey(KeyCode.LeftBracket))
       if (speed > 10f)
         speed -= 1f;
 
@@ -55,8 +60,6 @@ public class MovingCamera : MonoBehaviour {
 
     if (Input.GetKey(KeyCode.Space))
       GetComponent<Rigidbody>().AddForce(new Vector3(0, forceAdd, 0), ForceMode.Impulse);
-
-    transform.LookAt(transform.position + dir);
   }
 
 }

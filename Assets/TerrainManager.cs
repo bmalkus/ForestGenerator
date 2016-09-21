@@ -13,8 +13,10 @@ public class TerrainManager : MonoBehaviour
 	public int terrainChunkFaceSpacing = 4;
 
 	public int treeDensinity = 8;
+	public int detailsDensinity = 8;
 
-	public GameObject[] trees;
+	public GameObject[] treePrefabs;
+	public GameObject[] detailsPrefabs;
 
 	public int maxGenerating = 4;
 
@@ -30,7 +32,8 @@ public class TerrainManager : MonoBehaviour
 	{
 		perlinNoise = new PerlinNoise(terrainSeed);
 		Random.InitState(terrainSeed);
-		settings = new TerrainChunkSettings(terrainChunkLength, terrainChunkHeight, terrainChunkFaceSpacing, treeDensinity);
+		settings = new TerrainChunkSettings(terrainChunkLength, terrainChunkHeight, terrainChunkFaceSpacing,
+																				treeDensinity, detailsDensinity, treePrefabs, detailsPrefabs);
 	}
 	// }}}
 
@@ -94,7 +97,7 @@ public class TerrainManager : MonoBehaviour
 	{
 		if (!awaiting.ContainsKey(pos) && !generating.ContainsKey(pos))
 		{
-			var chunk = new TerrainChunk(settings, perlinNoise, terrainSeed, this, pos);
+			var chunk = new TerrainChunk(settings, perlinNoise, terrainSeed, pos);
 			awaiting[pos] = chunk;
 		}
 		else if (unneededChunks.Contains(pos))

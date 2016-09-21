@@ -27,22 +27,23 @@ public class TerrainChunk
   private System.Random rand;
 
   private float[,] heightmap;
-  private TerrainData terrainData;
+  private Terrain terrain;
 
-  private TerrainManager manager;
+  private int seed;
 
-  public TerrainChunk(TerrainChunkSettings settings, PerlinNoise perlinNoise, int seed, TerrainManager manager, Vector2i pos) // {{{
+  public TerrainChunk(TerrainChunkSettings settings, PerlinNoise perlinNoise, int seed, Vector2i pos) // {{{
   {
     this.pos = pos;
     this.settings = settings;
     this.perlinNoise = perlinNoise;
-    this.manager = manager;
+    this.seed = seed;
     rand = new System.Random((pos.x * 10000 + pos.z * 587) * seed);
 
     stages = new Action[]{
       CreateMesh,
-      CreateTerrain
-      // AddTrees
+      CreateTerrain,
+      AddTrees,
+      AddDetails,
     };
 
     gameObject = new GameObject("Terrain");
@@ -80,6 +81,11 @@ public class TerrainChunk
 	var current_point = new Vector3();
 	current_point.x = (x * spacing) - (len / 2f*spacing);
 	current_point.z = (z * spacing) - (len / 2f*spacing);
+	if (x > 1 && x < len - 1 && z > 1 && z < len - 1)
+	{
+	  current_point.x += ((float)rand.NextDouble() - 0.5f) * spacing;
+	  current_point.z += ((float)rand.NextDouble() - 0.5f) * spacing;
+	}
 
 	int offset = z % 2;
 	if (offset == 1)
@@ -162,64 +168,101 @@ public class TerrainChunk
 
     renderer.material.mainTexture = tex;
     renderer.material.color = Color.black;
+    gameObject.isStatic = true;
   }
   // }}}
 
   private void CreateTerrain() // {{{
   {
-    terrainData = new TerrainData();
+    var terrainData = new TerrainData();
     terrainData.heightmapResolution = settings.length;
     terrainData.alphamapResolution = settings.length;
+    terrainData.thickness = 5f;
     terrainData.SetHeights(0, 0, heightmap);
     terrainData.size = new Vector3(settings.length * settings.spacing, settings.height, settings.length * settings.spacing);
+    // terrainData.treePrototypes = settings.prototypes;
 
     var newTerrainGameObject = Terrain.CreateTerrainGameObject(terrainData);
     newTerrainGameObject.transform.parent = gameObject.transform;
     newTerrainGameObject.transform.position = new Vector3(worldPosition.x - settings.length * settings.spacing/2f,
 							  0f,
 							  worldPosition.z - settings.length * settings.spacing/2f);
-    newTerrainGameObject.GetComponent<Terrain>().Flush();
-    newTerrainGameObject.layer = 8;
+    terrain = newTerrainGameObject.GetComponent<Terrain>();
+    terrain.drawHeightmap = false;
+    terrain.Flush();
   }
   // }}}
 
   private void AddTrees() // {{{
   {
+    UnityEngine.Random.seed = (pos.x * 10000 + pos.z * 587) * seed;
     int trees = UnityEngine.Random.Range((int)(settings.treeDensinity * 0.6f), (int)(settings.treeDensinity * 1.4f) + 1);
 
     for (int i = 0; i < trees; ++i)
     {
-      float x = (UnityEngine.Random.Range(-settings.length * settings.spacing / 2f, settings.length * settings.spacing / 2f));
-      float z = (UnityEngine.Random.Range(-settings.length * settings.spacing / 2f, settings.length * settings.spacing / 2f));
-      x += worldPosition.x;
-      z += worldPosition.z;
+      float x = (float) rand.NextDouble();
+      float z = (float) rand.NextDouble();
 
+      var steepness = terrain.terrainData.GetSteepness(x, z);
 
-      // var meshFilter = treeGO.AddComponent<MeshFilter>();
-      // treeGO.transform.parent = gameObject.transform;
+      if (steepness * steepness > UnityEngine.Random.Range(40f, 80f))
+      {
+	continue;
+      }
 
-      // meshFilter.mesh = manager.trees[UnityEngine.Random.Range(0, manager.trees.Length)];
-      // treeGO.transform.position = new Vector3(x, 0, z);
+      var pos = new Vector3(x, 0f, z);
+      pos.x = (pos.x - 0.5f) * settings.length * settings.spacing + worldPosition.x;
+      pos.z = (pos.z - 0.5f) * settings.length * settings.spacing + worldPosition.z;
+      pos.y = terrain.SampleHeight(pos) + gameObject.transform.position.y;
 
-      // var ray = new Ray();
-      // Debug.Log(ray.ToString());
-      RaycastHit hit;
-      Physics.Raycast(new Vector3(x, settings.height, z), Vector3.down, out hit);
-      var treeInd = UnityEngine.Random.Range(0, manager.trees.Length);
-      var tree = GameObject.Instantiate(manager.trees[treeInd], new Vector3(x, hit.point.y, z), Quaternion.identity, gameObject.transform);
+      var treeInd = UnityEngine.Random.Range(0, settings.prefabs.Length);
+      var tree = GameObject.Instantiate(settings.prefabs[treeInd], pos, Quaternion.Euler(0, UnityEngine.Random.Range(0, 360),  0), gameObject.transform);
+
       var hScale = UnityEngine.Random.Range(5f, 11f);
       var wScale = hScale + UnityEngine.Random.Range(-1f, 1f);
       tree.transform.localScale = new Vector3(wScale, hScale, wScale);
+      // var meshFilter = treeGO.AddComponent<MeshFilter>();
+      // treeGO.transform.parent = gameObject.transform;
 
-      // tree.position = new Vector3(x, 1.0f, z);
+
+      // meshFilter.mesh = manager.trees[UnityEngine.Random.Range(0, manager.trees.Length)];
+      // treeGO.transform.position = new Vector3(x, 0, z);
+      // float x = (UnityEngine.Random.Range(0f, 1f));
+      // float z = (UnityEngine.Random.Range(0f, 1f));
+      // var tree = new TreeInstance();
+      // tree.position = new Vector3(x, 0f, z);
       // tree.heightScale = UnityEngine.Random.Range(1.5f, 6f);
       // tree.widthScale = tree.heightScale + UnityEngine.Random.Range(-1f, 1f);
       // tree.lightmapColor = Color.white;
       // tree.color = Color.white;
-      // tree.prototypeIndex = UnityEngine.Random.Range(0, prototypes.Length);
+      // tree.prototypeIndex = UnityEngine.Random.Range(0, settings.prototypes.Length);
       // tree.rotation = UnityEngine.Random.Range(0f, 2f * (float) Math.PI);
-      // // tree.rotation = (i % 2 == 0) ? 0f : 140f;
-      // Terrain.AddTreeInstance(tree);
+      // terrain.AddTreeInstance(tree);
+    }
+  }
+  // }}}
+
+  private void AddDetails() // {{{
+  {
+    UnityEngine.Random.seed = (pos.x * 10000 + pos.z * 587) * seed * 4532;
+    int grass = UnityEngine.Random.Range((int)(settings.detailsDensinity * 0.6f), (int)(settings.detailsDensinity * 1.4f) + 1);
+
+    for (int i = 0; i < grass; ++i)
+    {
+      float x = (float) rand.NextDouble();
+      float z = (float) rand.NextDouble();
+
+      var pos = new Vector3(x, 0f, z);
+      pos.x = (pos.x - 0.5f) * settings.length * settings.spacing + worldPosition.x;
+      pos.z = (pos.z - 0.5f) * settings.length * settings.spacing + worldPosition.z;
+      pos.y = terrain.SampleHeight(pos) + gameObject.transform.position.y - 0.5f;
+
+      var detInd = UnityEngine.Random.Range(0, settings.details.Length);
+      var det = GameObject.Instantiate(settings.details[detInd], pos, Quaternion.Euler(0, UnityEngine.Random.Range(0, 360),  0), gameObject.transform);
+
+      var hScale = UnityEngine.Random.Range(5f, 11f);
+      var wScale = hScale + UnityEngine.Random.Range(-1f, 1f);
+      det.transform.localScale = new Vector3(wScale, hScale, wScale);
     }
   }
   // }}}
